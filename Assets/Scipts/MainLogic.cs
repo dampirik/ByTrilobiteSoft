@@ -106,7 +106,6 @@ public class MainLogic : MonoBehaviour
         
         _cubes = new LandCube[sizeX][];
 
-        //создаем
         for (var x = 0; x < sizeX; x++)
         {
             _cubes[x] = new LandCube[sizeY];
@@ -199,11 +198,11 @@ public class MainLogic : MonoBehaviour
                 yield return null;//Пропускать каждые 16 элементов
             }
         }
-        
-        //заполняем StartBuilding %
-        var countcubes = startBuilding * nX * nY / 100;
 
-	    var currentCountcubes = 0;
+        //заполняем StartBuilding %
+        var countcubes = (int)Math.Round((startBuilding * nX * nY / 100f), 0, MidpointRounding.AwayFromZero);
+
+        var currentCountcubes = 0;
         
 	    while (currentCountcubes < countcubes)
 	    {
