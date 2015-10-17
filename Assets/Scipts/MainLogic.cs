@@ -24,12 +24,17 @@ public class MainLogic : MonoBehaviour
 
     private Vector3 _oldMousePosition;
 
-    private int _size, _startBuilding;
+    private int _size;
+
+    private int _startBuilding;
+
     private Vector3 _startCamera;
 
     private readonly List<Building> _buildings;
 
     private BuildingType _oldBuildingSize;
+
+    private bool _isCreate;
 
     public MainLogic()
     {
@@ -77,6 +82,9 @@ public class MainLogic : MonoBehaviour
             }
             _cubes = null;
         }
+
+        CurrentBuildingSize = BuildingType.None;
+        _oldBuildingSize = BuildingType.None;
     }
 
     public void SetSize(string value)
@@ -98,8 +106,8 @@ public class MainLogic : MonoBehaviour
     private void Create(int sizeX, int sizeY, int startBuilding)
     {
         if (sizeX < 1 || sizeX > 100 ||
-            sizeY < 1 || sizeY > 100 || 
-            sizeY < 0 || sizeY > 100)
+            sizeY < 1 || sizeY > 100 ||
+            startBuilding < 0 || startBuilding > 100)
             return;
 
         _loadingMenu.SetActive(false);
@@ -163,6 +171,7 @@ public class MainLogic : MonoBehaviour
 
     IEnumerator CreateDefaultState(int nX, int nY, int startBuilding)
     {
+        _isCreate = true;
         //создаем блоки по спирали от центра
 
         // центр
@@ -233,6 +242,8 @@ public class MainLogic : MonoBehaviour
 	    }
 
         _gameMenu.SetActive(true);
+
+        _isCreate = false;
     }
 
     public bool CheckFree(int x, int y, out LandCube result)
@@ -325,7 +336,7 @@ public class MainLogic : MonoBehaviour
         _buildings.Add(building);
     }
 
-    private void ClearAciveCubes()
+    private void ClearActiveCubes()
     {
         if (_activeCubes != null)
         {
@@ -340,9 +351,12 @@ public class MainLogic : MonoBehaviour
 	// Update is called once per frame
 	void Update ()
     {
+        if (_isCreate)
+            return;
+
         if (CurrentBuildingSize != _oldBuildingSize)
         {
-            ClearAciveCubes();
+            ClearActiveCubes();
             
             //changeState
             foreach (var building in _buildings)
@@ -401,7 +415,7 @@ public class MainLogic : MonoBehaviour
 
         if (delta > 10)
         {
-            ClearAciveCubes();
+            ClearActiveCubes();
 
             _oldMousePosition = mousePosition;
 
