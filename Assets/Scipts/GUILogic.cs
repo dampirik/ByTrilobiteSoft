@@ -86,7 +86,7 @@ public class GUILogic : MonoBehaviour
         if (_activeBuilding != null)
         {
             var text = GameObject.Find("BuildingInfo").GetComponent<Text>();
-            text.text = "Здание размером ";
+            text.text = "Building size ";
 
             switch (_activeBuilding.Size)
             {
