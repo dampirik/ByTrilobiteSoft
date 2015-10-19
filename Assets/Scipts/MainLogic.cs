@@ -189,9 +189,12 @@ public class MainLogic : MonoBehaviour
         var isBlack = false;
         for (var i = 0; i < nX * nY; i++)
         {
-            var cube = (GameObject)Instantiate(LandCube, new Vector3(x, 0, y), Quaternion.identity);
+            var cube = (GameObject)Instantiate(LandCube, new Vector3(x, 0, y), Quaternion.AngleAxis(90, new Vector3(1f, 0f, 0f)));
             cube.GetComponent<MeshRenderer>().material.color = isBlack ? Color.black : Color.white;
             isBlack = !isBlack;
+
+            //Component -> Mesh -> Combine Children.
+            //cube.GetComponent<Mesh>().CombineMeshes();
 
             var script = cube.GetComponent<LandCube>();
             script.Position = new Vector2(x, y);
@@ -310,11 +313,11 @@ public class MainLogic : MonoBehaviour
 
         if ((BuildingType) size == BuildingType.Size2X2)
         {
-            position = new Vector3(cubes[0].Position.x + 0.5f, 1, cubes[0].Position.y - 0.5f);
+            position = new Vector3(cubes[0].Position.x + 0.5f, 0.5f, cubes[0].Position.y - 0.5f);
         }
         else
         {
-            position = new Vector3(cubes[0].Position.x, 1, cubes[0].Position.y);
+            position = new Vector3(cubes[0].Position.x, 0.5f, cubes[0].Position.y);
         }
 
         var buildingObject = (GameObject)Instantiate(Buildings[size - 1], position, Quaternion.identity);
