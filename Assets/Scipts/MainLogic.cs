@@ -105,8 +105,8 @@ public class MainLogic : MonoBehaviour
 
     private void Create(int sizeX, int sizeY, int startBuilding)
     {
-        if (sizeX < 1 || sizeX > 100 ||
-            sizeY < 1 || sizeY > 100 ||
+        if (sizeX < 1 || sizeX > 300 ||
+            sizeY < 1 || sizeY > 300 ||
             startBuilding < 0 || startBuilding > 100)
             return;
 
@@ -187,7 +187,6 @@ public class MainLogic : MonoBehaviour
         var direction = SpiralDirection.Left; // сначала пойдем влево
 
         var isBlack = false;
-        var step = 0;
         for (var i = 0; i < nX * nY; i++)
         {
             var cube = (GameObject)Instantiate(LandCube, new Vector3(x, 0, y), Quaternion.identity);
@@ -199,20 +198,14 @@ public class MainLogic : MonoBehaviour
             _cubes[x][y] = script;
 
             FillSpiralStep(ref x, ref y, ref direction, ref minX, ref minY, ref maxX, ref maxY);
-
-            step++;
-            if (step >= 16)
-            {
-                step = 0;
-                yield return null;//Пропускать каждые 16 элементов
-            }
         }
+
+        yield return null;
 
         //заполняем StartBuilding %
         var countcubes = (int)Math.Round((startBuilding * nX * nY / 100f), 0, MidpointRounding.AwayFromZero);
 
         var currentCountcubes = 0;
-        
 	    while (currentCountcubes < countcubes)
 	    {
             var sizeBuilding = UnityEngine.Random.Range(1, 4);
@@ -237,8 +230,6 @@ public class MainLogic : MonoBehaviour
 
             if (currentCountcubes == countcubes)
                 break;
-            
-            yield return null;
 	    }
 
         _gameMenu.SetActive(true);
