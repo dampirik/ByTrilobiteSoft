@@ -2,124 +2,91 @@
 using System.Linq;
 using Assets.Scipts;
 using UnityEngine;
-using System.Collections;
 using UnityEngine.EventSystems;
 using System.Collections.Generic;
 
 public class MainLogic : MonoBehaviour
 {
-    public static BuildingType CurrentBuildingSize;
+    [Range(1,300)] public int Size;
+    
+    [Range(0, 100)] public int StartBuilding;
 
-    public GameObject LandCube;
+    public BuildingType CurrentBuildingSize;
+
+    public GameObject LandCursorPrefab;
 
     public GameObject[] Buildings = new GameObject[3];
-    
-    private LandCube[][] _cubes;
 
-    private GameObject _mainCamera;
-    private GameObject _gameMenu;
-    private GameObject _loadingMenu;
-
-    private LandCube[] _activeCubes;
+    private readonly LandCursor[] _cursor;
 
     private Vector3 _oldMousePosition;
-
-    private int _size;
-
-    private int _startBuilding;
-
-    private Vector3 _startCamera;
 
     private readonly List<Building> _buildings;
 
     private BuildingType _oldBuildingSize;
 
-    private bool _isCreate;
+    private CellsController _cellsController;
+
+    private MeshCollider _land;
 
     public MainLogic()
     {
         _oldMousePosition = Vector2.zero;
-        _size = _startBuilding = 1;
         _buildings = new List<Building>();
+        _cursor = new LandCursor[9];
     }
-
+    
     // Use this for initialization
-	void Start ()
-	{
-        _mainCamera = GameObject.Find("Main Camera");
-
-        _gameMenu = GameObject.Find("GameMenu");
-        _gameMenu.SetActive(false);
-
-        _loadingMenu = GameObject.Find("LoadingMenu");
-
-        _startCamera = _mainCamera.transform.position;
-	}
-
-    public void Reset()
+	void Start()
     {
-        _loadingMenu.SetActive(true);
-        _gameMenu.SetActive(false);
-
-        foreach (var building in _buildings)
-        {
-            building.Release();
-            Destroy(building.gameObject);
-        }
-        _buildings.Clear();
-
-        if (_cubes != null)
-        {
-            for (var x = 0; x < _cubes.Length; x++)
-            {
-                for (var y = 0; y < _cubes[x].Length; y++)
-                {
-                    var cube = _cubes[x][y];
-                    Destroy(cube.gameObject);
-                    _cubes[x][y] = null;
-                }
-                _cubes[x] = null;
-            }
-            _cubes = null;
-        }
-
-        CurrentBuildingSize = BuildingType.None;
-        _oldBuildingSize = BuildingType.None;
-    }
-
-    public void SetSize(string value)
-    {
-        int.TryParse(value, out _size);
-    }
-
-    public void SetStartBuilding(string value)
-    {
-        int.TryParse(value, out _startBuilding);
-    }
-
-    public void Create()
-    {
-        Debug.Log(string.Format("Create sizeX: {0} sizeY: {1} startBuilding: {2}", _size, _size, _startBuilding));
-        Create(_size, _size, _startBuilding);
-    }
-
-    private void Create(int sizeX, int sizeY, int startBuilding)
-    {
-        if (sizeX < 1 || sizeX > 300 ||
-            sizeY < 1 || sizeY > 300 ||
-            startBuilding < 0 || startBuilding > 100)
-            return;
-
-        _loadingMenu.SetActive(false);
+        var land = GameObject.Find("Land");
+        land.transform.localScale = new Vector3(Size, Size, 1);
+        land.GetComponent<MeshRenderer>().material.mainTextureScale = new Vector2(Size / 2f, Size / 2f);
+        land.transform.position = Size % 2 == 0 ? new Vector3(0.5f, 0, 0.5f) : new Vector3(0, 0, 0);
         
-        _cubes = new LandCube[sizeX][];
+        _land = land.GetComponent<MeshCollider>();
 
-        for (var x = 0; x < sizeX; x++)
+        _cellsController = new CellsController(Size);
+
+        CreateDefaultBuildings(Size, StartBuilding);
+
+        for (var i = 0; i < _cursor.Length; i++)
         {
-            _cubes[x] = new LandCube[sizeY];
+            var landCursor = (GameObject)Instantiate(LandCursorPrefab, new Vector3(0, 0.005f, 0), Quaternion.AngleAxis(90, new Vector3(1, 0, 0)));
+            var cursor = landCursor.GetComponent<LandCursor>();
+            cursor.IsActive = false;
+            _cursor[i] = cursor;
         }
+    }
 
-        StartCoroutine(CreateDefaultState(sizeX, sizeY, startBuilding));
+    private void CreateDefaultBuildings(int size, int startBuilding)
+    {
+        var countcubes = (int)Math.Round((startBuilding * size * size / 100f), 0, MidpointRounding.AwayFromZero);
+
+        var currentCountcubes = 0;
+        while (currentCountcubes < countcubes)
+        {
+            var typeBuilding = UnityEngine.Random.Range(1, 4);
+            var sizeBuilding = typeBuilding * typeBuilding;
+
+            if (currentCountcubes + sizeBuilding > countcubes)
+                continue;
+
+            var rndX = UnityEngine.Random.Range(-size / 2, size / 2);
+            var rndY = UnityEngine.Random.Range(-size / 2, size / 2);
+            var ray = new Vector3(rndX, 0, rndY);
+
+            var result = SetBuilding(ray, (BuildingType)typeBuilding);
+            if (!result)
+                continue;
+
+            currentCountcubes += sizeBuilding;
+
+            if (currentCountcubes == countcubes)
+            {
+                break;
+            }
+        }
     }
 
     private enum SpiralDirection
@@ -169,188 +136,77 @@ public class MainLogic : MonoBehaviour
         }
     }
 
-    IEnumerator CreateDefaultState(int nX, int nY, int startBuilding)
-    {
-        _isCreate = true;
-        //создаем блоки по спирали от центра
-
-        // центр
-        var x = nX / 2;
-        var y = nY / 2;
-        
-        //устанавливываем камеру в центр
-        _mainCamera.transform.position = new Vector3(_startCamera.x + x, _startCamera.y, _startCamera.z + y);
-
-        // задаем границы движения 
-        var minX = x; var maxX = x; // влево вправо
-        var minY = y; var maxY = y; // вверх вниз
-        var direction = SpiralDirection.Left; // сначала пойдем влево
-
-        var isBlack = false;
-        for (var i = 0; i < nX * nY; i++)
-        {
-            var cube = (GameObject)Instantiate(LandCube, new Vector3(x, 0, y), Quaternion.AngleAxis(90, new Vector3(1f, 0f, 0f)));
-            cube.GetComponent<MeshRenderer>().material.color = isBlack ? Color.black : Color.white;
-            isBlack = !isBlack;
-
-            //Component -> Mesh -> Combine Children.
-            //cube.GetComponent<Mesh>().CombineMeshes();
-
-            var script = cube.GetComponent<LandCube>();
-            script.Position = new Vector2(x, y);
-            _cubes[x][y] = script;
-
-            FillSpiralStep(ref x, ref y, ref direction, ref minX, ref minY, ref maxX, ref maxY);
-        }
-
-        yield return null;
-
-        //заполняем StartBuilding %
-        var countcubes = (int)Math.Round((startBuilding * nX * nY / 100f), 0, MidpointRounding.AwayFromZero);
-
-        var currentCountcubes = 0;
-	    while (currentCountcubes < countcubes)
-	    {
-            var sizeBuilding = UnityEngine.Random.Range(1, 4);
-            var size = sizeBuilding * sizeBuilding;
-            
-	        if (currentCountcubes + size > countcubes)
-	            continue;
-
-            var rndX = UnityEngine.Random.Range(0, nX);
-            var rndY = UnityEngine.Random.Range(0, nY);
-	        var ray = new Vector3(rndX, 0, rndY);
-
-	        LandCube[] cubes;
-            var result = CheckBuilding(ray, (BuildingType)sizeBuilding, out cubes);
-            
-	        if (!result)
-	            continue;
-
-            SetBuilding(cubes);
-
-	        currentCountcubes += size;
-
-            if (currentCountcubes == countcubes)
-                break;
-	    }
-
-        _gameMenu.SetActive(true);
-
-        _isCreate = false;
-    }
-
-    public bool CheckFree(int x, int y, out LandCube result)
-    {
-        if (x < 0 || x >= _cubes.Length)
-        {
-            result = null;
-            return false;
-        }
-
-        if (y < 0 || y >= _cubes[x].Length)
-        {
-            result = null;
-            return false;
-        }
-
-        result = _cubes[x][y];
-
-        if (result == null)
-        {
-            return false;
-        }
-
-        return !_cubes[x][y].IsBusy;
-    }
-
-    public bool CheckBuilding(Vector3 ray, BuildingType buildingType, out LandCube[] cubes)
+    private void GetPosition(Vector3 ray, out int x, out int y)
     {
         //проверяем блоки по спирали от центра
-        var x = (int)Math.Round(ray.x, 0, MidpointRounding.AwayFromZero);
-        var y = (int)Math.Round(ray.z, 0, MidpointRounding.AwayFromZero);
-        
+        x = (int)Math.Round(ray.x, 0, MidpointRounding.AwayFromZero);
+        y = (int)Math.Round(ray.z, 0, MidpointRounding.AwayFromZero);
+    }
+    
+    private bool SetBuilding(Vector3 ray, BuildingType type)
+    {
+        //проверяем блоки по спирали от центра
+        int startX, startY;
+        GetPosition(ray, out startX, out startY);
+
+        var x = startX;
+        var y = startY;
+
         // задаем границы движения 
         var minX = x; var maxX = x; // влево вправо
         var minY = y; var maxY = y; // вверх вниз
         var direction = SpiralDirection.Up; // сначала пойдем вверх
+        
+        var n = (int)type;
 
-        var n = (int) buildingType;
-
-        cubes = new LandCube[n*n];
+        var points = new Point[n * n];
 
         for (var i = 0; i < n * n; i++)
         {
-            LandCube cube;
-            CheckFree(x, y, out cube);
-            cubes[i] = cube;
+            var result = _cellsController.CheckFree(x, y);
+            if (result == null || !result.Value)
+            {
+                foreach (var point in points.Where(s => s != null))
+                {
+                    _cellsController.SetFree(point.X, point.Y);
+                }
+                return false;
+            }
+
+            points[i] = new Point {X = x, Y = y};
+           _cellsController.SetBusy(x, y);
 
             FillSpiralStep(ref x, ref y, ref direction, ref minX, ref minY, ref maxX, ref maxY);
         }
 
-        return cubes.All(c => c != null && !c.IsBusy);
-    }
+        var position = type == BuildingType.Size2X2 ? new Vector3(startX + 0.5f, 0.5f, startY - 0.5f) : new Vector3(startX, 0.5f, startY);
 
-    public void SetBuilding(LandCube[] cubes)
-    {
-        if (cubes == null || cubes.Length<1)
-        {
-            throw new ArgumentException();
-        }
-
-        if(cubes.Any(c => c == null || c.IsBusy))
-        {
-            throw new ArgumentException();
-        }
-
-        var size = (int)Math.Sqrt(cubes.Length);
-        if (size <= 0)
-        {
-            throw new ArgumentException();
-        }
-
-        Vector3 position;
-
-        if ((BuildingType) size == BuildingType.Size2X2)
-        {
-            position = new Vector3(cubes[0].Position.x + 0.5f, 0.5f, cubes[0].Position.y - 0.5f);
-        }
-        else
-        {
-            position = new Vector3(cubes[0].Position.x, 0.5f, cubes[0].Position.y);
-        }
-
-        var buildingObject = (GameObject)Instantiate(Buildings[size - 1], position, Quaternion.identity);
+        var buildingObject = (GameObject)Instantiate(Buildings[(int)type - 1], position, Quaternion.identity);
         var building = buildingObject.GetComponent<Building>();
-        building.SetLandCubes(cubes);
+        building.Points = points;
 
         if (CurrentBuildingSize != BuildingType.None)
             building.SetShadowMode();
 
         _buildings.Add(building);
+
+        return true;
     }
 
-    private void ClearActiveCubes()
+    private void ClearCursor()
     {
-        if (_activeCubes != null)
+        foreach (var cursor in _cursor)
         {
-            foreach (var cube in _activeCubes.Where(c => c != null))
-            {
-                cube.Deactivate();
-            }
-            _activeCubes = null;
-        }   
+            cursor.IsActive = false;
+        }
     }
-    
-	// Update is called once per frame
+
+    // Update is called once per frame
 	void Update ()
     {
-        if (_isCreate)
-            return;
-
         if (CurrentBuildingSize != _oldBuildingSize)
         {
-            ClearActiveCubes();
+            ClearCursor();
             
             //changeState
             foreach (var building in _buildings)
@@ -380,7 +236,12 @@ public class MainLogic : MonoBehaviour
 
     public void BuildingDelete(Building building)
     {
-        building.Release();
+        var points = building.Points;
+        foreach (var point in points.Where(s => s != null))
+        {
+            _cellsController.SetFree(point.X, point.Y);
+        }
+
         Destroy(building.gameObject);
         _buildings.Remove(building);
     }
@@ -406,34 +267,76 @@ public class MainLogic : MonoBehaviour
     {
         var mousePosition = Input.mousePosition;
         var delta = Math.Abs(_oldMousePosition.x - mousePosition.x) + Math.Abs(_oldMousePosition.y - mousePosition.y);
+        
+        var countBuilding = (int)CurrentBuildingSize*(int)CurrentBuildingSize;
 
         if (delta > 10)
-        {
-            ClearActiveCubes();
-
+        {           
             _oldMousePosition = mousePosition;
 
             var ray = Camera.main.ScreenPointToRay(mousePosition);
             RaycastHit hit;
-
-            if (Physics.Raycast(ray, out hit))
+            
+            if (_land.Raycast(ray, out hit, 1000))
             {
-                CheckBuilding(hit.point, CurrentBuildingSize, out _activeCubes);
+                int startX, startY;
 
-                var anyCubes = _activeCubes.Any(c => c == null);
+                GetPosition(hit.point, out startX, out startY);
 
-                foreach (var cube in _activeCubes.Where(c => c != null))
+                var x = startX;
+                var y = startY;
+
+                // задаем границы движения 
+                var minX = x; var maxX = x; // влево вправо
+                var minY = y; var maxY = y; // вверх вниз
+                var direction = SpiralDirection.Up; // сначала пойдем вверх
+                
+                var any = false;
+                for (var i = 0; i < countBuilding; i++)
                 {
-                    cube.Activate(anyCubes);
+                    var cursor = _cursor[i];
+                    var result = _cellsController.CheckFree(x, y);
+                    if (result == null)
+                    {
+                        any = true;
+                        cursor.IsActive = false;
+                    }
+                    else
+                    {
+                        cursor.IsActive = true;
+                        cursor.IsBusy = !result.Value;
+                    }
+
+                    var position = cursor.gameObject.transform.position;
+                    cursor.gameObject.transform.position = new Vector3(x, position.y, y);
+
+                    FillSpiralStep(ref x, ref y, ref direction, ref minX, ref minY, ref maxX, ref maxY);
                 }
+
+                if (any)
+                {
+                    foreach (var cursor in _cursor.Where(s => s.IsActive))
+                    {
+                        cursor.IsBusy = true;
+                    }
+                }
+            }
+            else
+            {
+                ClearCursor();
             }
         }
 
         if (Input.GetMouseButtonDown(0) &&
-            _activeCubes != null && _activeCubes.All(c => c != null && !c.IsBusy) &&
-            !EventSystem.current.IsPointerOverGameObject())
+            !EventSystem.current.IsPointerOverGameObject() &&
+            _cursor.Count(s => s.IsActive && !s.IsBusy) == countBuilding)
         {
-            SetBuilding(_activeCubes);
+            SetBuilding(_cursor[0].gameObject.transform.position, CurrentBuildingSize);
+
+            foreach (var cursor in _cursor.Where(s => s.IsActive))
+            {
+                cursor.IsBusy = true;
+            }
         }
     }
 }

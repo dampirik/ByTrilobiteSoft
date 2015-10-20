@@ -19,33 +19,11 @@ public class GUILogic : MonoBehaviour
 
         _menuInfoBuilding = GameObject.Find("InfoMenu");
         _menuInfoBuilding.SetActive(false);
-
-        var input = GameObject.Find("Size").GetComponent<InputField>();
-        var se = new InputField.SubmitEvent();
-        se.AddListener(OnSize);
-        input.onEndEdit = se;
-        
-        input = GameObject.Find("StartBuilding").GetComponent<InputField>();
-        se = new InputField.SubmitEvent();
-        se.AddListener(OnStartBuilding);
-        input.onEndEdit = se;
-    }
-
-    private void OnSize(string arg)
-    {
-        var mainLogic = GameObject.Find("SceneLogic").GetComponent<MainLogic>();
-        mainLogic.SetSize(arg);
     }
     
-    private void OnStartBuilding(string arg)
-    {
-        var mainLogic = GameObject.Find("SceneLogic").GetComponent<MainLogic>();
-        mainLogic.SetStartBuilding(arg);
-    }
-
     public void OnSelectCubeSize()
     {
-        MainLogic.CurrentBuildingSize = BuildingType.None;
+        GameObject.Find("SceneLogic").GetComponent<MainLogic>().CurrentBuildingSize = BuildingType.None;
 
         if (!_isShow)
         {
@@ -78,7 +56,7 @@ public class GUILogic : MonoBehaviour
     public void OnCreate(int size)
     {
         HideSelectCubeSize();
-        MainLogic.CurrentBuildingSize = (BuildingType) size;
+        GameObject.Find("SceneLogic").GetComponent<MainLogic>().CurrentBuildingSize = (BuildingType)size;
     }
 
     public void OnBuildingInfo()
@@ -139,7 +117,7 @@ public class GUILogic : MonoBehaviour
         if (_isShow)
         {
             HideSelectCubeSize();
-            MainLogic.CurrentBuildingSize = BuildingType.None;
+            GameObject.Find("SceneLogic").GetComponent<MainLogic>().CurrentBuildingSize = BuildingType.None;
         }
     }
 
@@ -147,7 +125,7 @@ public class GUILogic : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Escape))
         {
-            MainLogic.CurrentBuildingSize = BuildingType.None;
+            GameObject.Find("SceneLogic").GetComponent<MainLogic>().CurrentBuildingSize = BuildingType.None;
 
             if (_activeBuilding != null)
                 SetActiveBuilding(null);
@@ -161,7 +139,7 @@ public class GUILogic : MonoBehaviour
             //click вне зоны меню
             HideSelectCubeSize();
 
-            MainLogic.CurrentBuildingSize = BuildingType.None;
+            GameObject.Find("SceneLogic").GetComponent<MainLogic>().CurrentBuildingSize = BuildingType.None;
         }
     }
 }
